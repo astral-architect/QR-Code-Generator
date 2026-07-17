@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Generator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --surface2: #f0efec;
+    --border: #e0ddd8;
+    --border-strong: #c8c5bf;
+    --text: #1a1a18;
+    --text2: #5a5a57;
+    --text3: #9a9a96;
+    --accent: #1a56db;
+    --accent-bg: #e8f0fd;
+    --accent-border: #a8c0f5;
+    --radius: 8px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  header svg { color: var(--accent); }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  header span {
+    font-size: 12px;
+    color: var(--text3);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 0;
+    max-width: 1100px;
+    margin: 32px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* LEFT: Preview */
+  .preview-panel {
+    padding: 32px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .url-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .url-row input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .url-row input:focus { border-color: var(--accent); }
+
+  button {
+    padding: 10px 18px;
+    background: var(--text);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  button:hover { opacity: .85; }
+
+  .upload-zone {
+    width: 100%;
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    transition: background .15s, border-color .15s;
+  }
+  .upload-zone:hover { background: var(--bg); border-color: var(--accent); }
+  .upload-zone svg { flex-shrink: 0; color: var(--text3); }
+
+  .upload-msg { font-size: 12px; color: var(--text3); text-align: center; }
+
+  .canvas-wrap {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    width: 100%;
+  }
+
+  #qr-canvas { display: none; max-width: 280px; }
+
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: var(--text3);
+    font-size: 13px;
+  }
+  .placeholder svg { opacity: .35; }
+
+  .dl-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .dl-row button {
+    flex: 1;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .dl-row button:hover { background: var(--border); }
+
+  /* RIGHT: Controls */
+  .controls-panel { display: flex; flex-direction: column; }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 14px 12px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { padding: 20px 20px; flex: 1; overflow-y: auto; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 10px;
+    margin-top: 16px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* Swatch grids */
+  .swatch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .swatch-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+
+  .swatch {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 6px 5px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text2);
+    transition: all .15s;
+    background: var(--surface);
+  }
+  .swatch:hover { border-color: var(--accent); }
+  .swatch.active { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+  .swatch canvas { display: block; margin: 0 auto 4px; }
+
+  /* Color controls */
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .color-row label { font-size: 12px; color: var(--text2); width: 88px; flex-shrink: 0; }
+  input[type="color"] {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 2px;
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+  }
+  input[type="text"].hex {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  input[type="text"].hex:focus { border-color: var(--accent); }
+
+  .presets-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .preset-dot {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform .15s, border-color .15s;
+  }
+  .preset-dot:hover { transform: scale(1.15); border-color: var(--border-strong); }
+
+  /* Logo */
+  .logo-drop {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .logo-drop:hover { background: var(--bg); }
+  .logo-drop svg { color: var(--text3); margin-bottom: 6px; }
+  .logo-drop p { font-size: 12px; color: var(--text2); }
+
+  .logo-preview { text-align: center; margin: 10px 0; }
+  .logo-preview img { max-height: 60px; border-radius: 6px; border: 1px solid var(--border); }
+  .logo-preview button { background: none; color: var(--text2); border: 1px solid var(--border); font-size: 11px; padding: 4px 10px; margin-top: 6px; }
+
+  .range-row { margin-bottom: 14px; }
+  .range-row label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 5px; }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  /* Frame tab */
+  .frame-text-row { margin-top: 12px; }
+  .frame-text-row label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 5px; }
+  .frame-text-row input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  .frame-text-row input:focus { border-color: var(--accent); }
+
+  @media (max-width: 700px) {
+    .main { grid-template-columns: 1fr; margin: 0; border-radius: 0; border-left: none; border-right: none; }
+    .preview-panel { border-right: none; border-bottom: 1px solid var(--border); padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+    <rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3m4 0h-1m-3 3h1m2 2h-3m0-2v3"/>
+  </svg>
+  <h1>QR Generator</h1>
+  <span>Free · No ads</span>
+</header>
+
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="preview-panel">
+    <div class="url-row">
+      <input type="text" id="qr-text" placeholder="https://example.com" value="https://example.com">
+      <button id="gen-btn">Generate</button>
+    </div>
+
+    <div class="upload-zone" id="drop-zone">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M4 16l4-4 4 4 4-6 4 6"/><rect x="2" y="3" width="20" height="18" rx="2"/>
+      </svg>
+      <span>Drag & drop an image to generate QR from its hosted URL</span>
+      <input type="file" id="img-file" accept="image/*" style="display:none">
+    </div>
+    <div class="upload-msg" id="upload-msg" style="display:none"></div>
+
+    <div class="canvas-wrap">
+      <canvas id="qr-canvas"></canvas>
+      <div class="placeholder" id="placeholder">
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3m4 0h-1m-3 3h1m2 2h-3m0-2v3"/>
+        </svg>
+        <span>Enter a URL above and click Generate</span>
+      </div>
+    </div>
+
+    <div class="dl-row">
+      <button id="dl-png">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg>
+        Download PNG
+      </button>
+      <button id="dl-svg">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/></svg>
+        Download SVG
+      </button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="controls-panel">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="style">Style</button>
+      <button class="tab-btn" data-tab="color">Color</button>
+      <button class="tab-btn" data-tab="logo">Logo</button>
+      <button class="tab-btn" data-tab="frame">Frame</button>
+    </div>
+
+    <div class="tab-content">
+
+      <!-- STYLE TAB -->
+      <div class="tab-pane active" id="tab-style">
+        <div class="section-label">Dot style</div>
+        <div class="swatch-grid">
+          <div class="swatch active" data-dot="square"><canvas width="40" height="40" id="p-square"></canvas>Square</div>
+          <div class="swatch" data-dot="rounded"><canvas width="40" height="40" id="p-rounded"></canvas>Rounded</div>
+          <div class="swatch" data-dot="circle"><canvas width="40" height="40" id="p-circle"></canvas>Dots</div>
+        </div>
+        <div class="swatch-grid" style="margin-top:6px">
+          <div class="swatch" data-dot="diamond"><canvas width="40" height="40" id="p-diamond"></canvas>Diamond</div>
+          <div class="swatch" data-dot="star"><canvas width="40" height="40" id="p-star"></canvas>Star</div>
+          <div class="swatch" data-dot="cross"><canvas width="40" height="40" id="p-cross"></canvas>Cross</div>
+        </div>
+
+        <div class="section-label">Corner style</div>
+        <div class="swatch-grid">
+          <div class="swatch active" data-corner="square"><canvas width="40" height="40" id="pc-square"></canvas>Square</div>
+          <div class="swatch" data-corner="rounded"><canvas width="40" height="40" id="pc-rounded"></canvas>Rounded</div>
+          <div class="swatch" data-corner="extra"><canvas width="40" height="40" id="pc-extra"></canvas>Blob</div>
+        </div>
+      </div>
+
+      <!-- COLOR TAB -->
+      <div class="tab-pane" id="tab-color">
+        <div class="section-label">Colors</div>
+        <div class="color-row">
+          <label>QR dots</label>
+          <input type="color" id="c-qr" value="#000000">
+          <input type="text" class="hex" id="h-qr" value="#000000" maxlength="7">
+        </div>
+        <div class="color-row">
+          <label>Background</label>
+          <input type="color" id="c-bg" value="#ffffff">
+          <input type="text" class="hex" id="h-bg" value="#ffffff" maxlength="7">
+        </div>
+        <div class="color-row">
+          <label>Corners</label>
+          <input type="color" id="c-corner" value="#000000">
+          <input type="text" class="hex" id="h-corner" value="#000000" maxlength="7">
+        </div>
+
+        <div class="section-label">Presets</div>
+        <div class="presets-row">
+          <div class="preset-dot" style="background:#000000" title="Classic" data-qr="#000000" data-bg="#ffffff" data-co="#000000"></div>
+          <div class="preset-dot" style="background:#1a56db" title="Blue" data-qr="#1a56db" data-bg="#e8f0fd" data-co="#1a56db"></div>
+          <div class="preset-dot" style="background:#0f6e56" title="Forest" data-qr="#0f6e56" data-bg="#e1f5ee" data-co="#0f6e56"></div>
+          <div class="preset-dot" style="background:#993556" title="Rose" data-qr="#993556" data-bg="#fbeaf0" data-co="#993556"></div>
+          <div class="preset-dot" style="background:#534ab7" title="Violet" data-qr="#534ab7" data-bg="#eeedfe" data-co="#534ab7"></div>
+          <div class="preset-dot" style="background:#993c1d" title="Coral" data-qr="#993c1d" data-bg="#faece7" data-co="#993c1d"></div>
+          <div class="preset-dot" style="background:#1a1a2e" title="Dark" data-qr="#ffffff" data-bg="#1a1a2e" data-co="#ffffff"></div>
+          <div class="preset-dot" style="background:#b45309" title="Amber" data-qr="#b45309" data-bg="#fef3c7" data-co="#b45309"></div>
+        </div>
+      </div>
+
+      <!-- LOGO TAB -->
+      <div class="tab-pane" id="tab-logo">
+        <div class="section-label">Center logo</div>
+        <div class="logo-drop" id="logo-drop">
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L8 8m4-4l4 4"/><rect x="3" y="17" width="18" height="4" rx="1" fill="currentColor" stroke="none" opacity=".2"/>
+          </svg>
+          <p>Click or drag to upload logo</p>
+          <p style="font-size:11px;color:var(--text3);margin-top:2px">PNG with transparency recommended</p>
+          <input type="file" id="logo-file" accept="image/*" style="display:none">
+        </div>
+
+        <div class="logo-preview" id="logo-preview-box" style="display:none">
+          <img id="logo-thumb" src="" alt="logo">
+          <br>
+          <button id="logo-remove">✕ Remove logo</button>
+        </div>
+
+        <div class="section-label">Size & padding</div>
+        <div class="range-row">
+          <label>Logo size: <strong id="logo-pct">22</strong>%</label>
+          <input type="range" id="logo-sz" min="10" max="35" value="22" step="1">
+        </div>
+        <div class="range-row">
+          <label>Padding: <strong id="logo-pad-val">8</strong>px</label>
+          <input type="range" id="logo-pad" min="0" max="24" value="8" step="1">
+        </div>
+      </div>
+
+      <!-- FRAME TAB -->
+      <div class="tab-pane" id="tab-frame">
+        <div class="section-label">Frame style</div>
+        <div class="swatch-grid-2">
+          <div class="swatch active" data-frame="none"><canvas width="40" height="40" id="pf-none"></canvas>None</div>
+          <div class="swatch" data-frame="simple"><canvas width="40" height="40" id="pf-simple"></canvas>Border</div>
+          <div class="swatch" data-frame="rounded"><canvas width="40" height="40" id="pf-rounded"></canvas>Rounded</div>
+          <div class="swatch" data-frame="label"><canvas width="40" height="40" id="pf-label"></canvas>Label</div>
+        </div>
+
+        <div class="frame-text-row" id="frame-label-row" style="display:none">
+          <label>Label text</label>
+          <input type="text" id="frame-label-text" value="SCAN ME" placeholder="SCAN ME">
+        </div>
+      </div>
+
+    </div><!-- /tab-content -->
+  </div><!-- /controls-panel -->
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  dot: 'square', corner: 'square', frame: 'none', frameLabel: 'SCAN ME',
+  qrColor: '#000000', bgColor: '#ffffff', cornerColor: '#000000',
+  logoImg: null, logoSz: 22, logoPad: 8,
+  matrix: null
+};
+
+const canvas = document.getElementById('qr-canvas');
+const ctx = canvas.getContext('2d');
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function rr(cx, x, y, w, h, r) {
+  if (r <= 0) { cx.beginPath(); cx.rect(x, y, w, h); return; }
+  r = Math.min(r, w / 2, h / 2);
+  cx.beginPath();
+  cx.moveTo(x + r, y); cx.lineTo(x + w - r, y); cx.quadraticCurveTo(x + w, y, x + w, y + r);
+  cx.lineTo(x + w, y + h - r); cx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  cx.lineTo(x + r, y + h); cx.quadraticCurveTo(x, y + h, x, y + h - r);
+  cx.lineTo(x, y + r); cx.quadraticCurveTo(x, y, x + r, y);
+  cx.closePath();
+}
+
+function drawDot(cx, x, y, ms, style, color) {
+  const g = ms * 0.12;
+  cx.fillStyle = color;
+  if (style === 'circle') {
+    cx.beginPath(); cx.arc(x + ms / 2, y + ms / 2, (ms - g * 2) / 2, 0, Math.PI * 2); cx.fill();
+  } else if (style === 'rounded') {
+    rr(cx, x + g, y + g, ms - g * 2, ms - g * 2, ms * 0.32); cx.fill();
+  } else if (style === 'diamond') {
+    const cx2 = x + ms / 2, cy2 = y + ms / 2, s = (ms - g * 2) / 2;
+    cx.beginPath(); cx.moveTo(cx2, cy2 - s); cx.lineTo(cx2 + s, cy2); cx.lineTo(cx2, cy2 + s); cx.lineTo(cx2 - s, cy2); cx.closePath(); cx.fill();
+  } else if (style === 'star') {
+    const cx2 = x + ms / 2, cy2 = y + ms / 2, or = (ms - g * 2) / 2, ir = or * 0.45;
+    cx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = i * Math.PI / 5 - Math.PI / 2, r2 = i % 2 ? ir : or;
+      i === 0 ? cx.moveTo(cx2 + Math.cos(a) * r2, cy2 + Math.sin(a) * r2) : cx.lineTo(cx2 + Math.cos(a) * r2, cy2 + Math.sin(a) * r2);
+    }
+    cx.closePath(); cx.fill();
+  } else if (style === 'cross') {
+    const t = ms * 0.28, cx2 = x + ms / 2, cy2 = y + ms / 2, h = (ms - g * 2) / 2;
+    cx.fillRect(cx2 - t, cy2 - h, t * 2, h * 2);
+    cx.fillRect(cx2 - h, cy2 - t, h * 2, t * 2);
+  } else {
+    cx.fillRect(x + g, y + g, ms - g * 2, ms - g * 2);
+  }
+}
+
+function drawFinder(cx, x, y, ms, style, darkC, lightC) {
+  const r = style === 'square' ? 0 : style === 'rounded' ? ms * 0.9 : ms * 1.6;
+  cx.fillStyle = darkC; rr(cx, x, y, 7 * ms, 7 * ms, r); cx.fill();
+  cx.fillStyle = lightC; rr(cx, x + ms, y + ms, 5 * ms, 5 * ms, r * 0.55); cx.fill();
+  cx.fillStyle = darkC; rr(cx, x + 2 * ms, y + 2 * ms, 3 * ms, 3 * ms, r * 0.32); cx.fill();
+}
+
+// ── Render QR ───────────────────────────────────────────────────────────────
+function renderQR() {
+  const m = S.matrix;
+  if (!m) return;
+  const sz = m.modules.size, data = m.modules.data;
+  const margin = 2, total = sz + margin * 2;
+  const frameH = S.frame === 'label' ? 44 : 0;
+  const cs = 320;
+
+  canvas.width = cs; canvas.height = cs + frameH;
+  canvas.style.display = 'block';
+  document.getElementById('placeholder').style.display = 'none';
+
+  const ms = cs / total;
+
+  // Background / frame
+  ctx.clearRect(0, 0, cs, cs + frameH);
+  if (S.frame === 'none') {
+    ctx.fillStyle = S.bgColor; ctx.fillRect(0, 0, cs, cs);
+  } else {
+    const fr = S.frame === 'rounded' ? 18 : S.frame === 'label' ? 10 : 2;
+    ctx.fillStyle = S.bgColor;
+    rr(ctx, 0, 0, cs, cs + frameH, fr); ctx.fill();
+    ctx.strokeStyle = S.qrColor; ctx.lineWidth = 3;
+    rr(ctx, 0, 0, cs, cs + frameH, fr); ctx.stroke();
+  }
+
+  // Finder check
+  function isFR(r, c) {
+    return (r < 7 && c < 7) || (r < 7 && c >= sz - 7) || (r >= sz - 7 && c < 7);
+  }
+
+  // Data dots
+  for (let r = 0; r < sz; r++) {
+    for (let c = 0; c < sz; c++) {
+      if (!data[r * sz + c] || isFR(r, c)) continue;
+      drawDot(ctx, (c + margin) * ms, (r + margin) * ms, ms, S.dot, S.qrColor);
+    }
+  }
+
+  // Finder patterns
+  [
+    [margin * ms, margin * ms],
+    [(sz - 7 + margin) * ms, margin * ms],
+    [margin * ms, (sz - 7 + margin) * ms]
+  ].forEach(([fx, fy]) => drawFinder(ctx, fx, fy, ms, S.corner, S.cornerColor, S.bgColor));
+
+  // Logo
+  if (S.logoImg) {
+    const lsz = cs * (S.logoSz / 100), lx = (cs - lsz) / 2, ly = (cs - lsz) / 2, pad = S.logoPad;
+    ctx.fillStyle = S.bgColor;
+    rr(ctx, lx - pad, ly - pad, lsz + pad * 2, lsz + pad * 2, pad * 0.8); ctx.fill();
+    ctx.drawImage(S.logoImg, lx, ly, lsz, lsz);
+  }
+
+  // Frame label
+  if (S.frame === 'label' && frameH > 0) {
+    ctx.fillStyle = S.qrColor;
+    ctx.font = 'bold 15px -apple-system, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(S.frameLabel || 'SCAN ME', cs / 2, cs + frameH / 2);
+  }
+}
+
+// ── Generate ─────────────────────────────────────────────────────────────────
+function generateQR() {
+  const text = document.getElementById('qr-text').value.trim();
+  if (!text) return;
+  try {
+    S.matrix = QRCode.create(text, { errorCorrectionLevel: 'H' });
+    renderQR();
+  } catch (e) {
+    alert('Text is too long for a QR code. Try a shorter URL.');
+  }
+}
+
+document.getElementById('gen-btn').onclick = generateQR;
+document.getElementById('qr-text').addEventListener('keydown', e => { if (e.key === 'Enter') generateQR(); });
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('tab-' + b.dataset.tab).classList.add('active');
+  };
+});
+
+// ── Dot / corner / frame swatches ────────────────────────────────────────────
+document.querySelectorAll('[data-dot]').forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll('[data-dot]').forEach(x => x.classList.remove('active'));
+    el.classList.add('active'); S.dot = el.dataset.dot; renderQR();
+  };
+});
+document.querySelectorAll('[data-corner]').forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll('[data-corner]').forEach(x => x.classList.remove('active'));
+    el.classList.add('active'); S.corner = el.dataset.corner; renderQR();
+  };
+});
+document.querySelectorAll('[data-frame]').forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll('[data-frame]').forEach(x => x.classList.remove('active'));
+    el.classList.add('active'); S.frame = el.dataset.frame;
+    document.getElementById('frame-label-row').style.display = S.frame === 'label' ? 'block' : 'none';
+    renderQR();
+  };
+});
+
+// ── Colors ────────────────────────────────────────────────────────────────────
+function bindColor(cId, hId, key) {
+  const ci = document.getElementById(cId), hi = document.getElementById(hId);
+  ci.oninput = () => { hi.value = ci.value; S[key] = ci.value; renderQR(); };
+  hi.oninput = () => {
+    if (/^#[0-9a-fA-F]{6}$/.test(hi.value)) { ci.value = hi.value; S[key] = hi.value; renderQR(); }
+  };
+}
+bindColor('c-qr', 'h-qr', 'qrColor');
+bindColor('c-bg', 'h-bg', 'bgColor');
+bindColor('c-corner', 'h-corner', 'cornerColor');
+
+document.querySelectorAll('.preset-dot').forEach(p => {
+  p.onclick = () => {
+    S.qrColor = p.dataset.qr; S.bgColor = p.dataset.bg; S.cornerColor = p.dataset.co;
+    document.getElementById('c-qr').value = S.qrColor; document.getElementById('h-qr').value = S.qrColor;
+    document.getElementById('c-bg').value = S.bgColor; document.getElementById('h-bg').value = S.bgColor;
+    document.getElementById('c-corner').value = S.cornerColor; document.getElementById('h-corner').value = S.cornerColor;
+    renderQR();
+  };
+});
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+document.getElementById('logo-drop').onclick = () => document.getElementById('logo-file').click();
+document.getElementById('logo-file').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r2 = new FileReader();
+  r2.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      S.logoImg = img;
+      document.getElementById('logo-thumb').src = ev.target.result;
+      document.getElementById('logo-preview-box').style.display = 'block';
+      renderQR();
+    };
+    img.src = ev.target.result;
+  };
+  r2.readAsDataURL(f);
+};
+document.getElementById('logo-remove').onclick = () => {
+  S.logoImg = null;
+  document.getElementById('logo-preview-box').style.display = 'none';
+  document.getElementById('logo-file').value = '';
+  renderQR();
+};
+document.getElementById('logo-sz').oninput = e => {
+  S.logoSz = +e.target.value;
+  document.getElementById('logo-pct').textContent = S.logoSz;
+  renderQR();
+};
+document.getElementById('logo-pad').oninput = e => {
+  S.logoPad = +e.target.value;
+  document.getElementById('logo-pad-val').textContent = S.logoPad;
+  renderQR();
+};
+
+// ── Frame label ───────────────────────────────────────────────────────────────
+document.getElementById('frame-label-text').oninput = e => { S.frameLabel = e.target.value || 'SCAN ME'; renderQR(); };
+
+// ── Image upload for QR content ───────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+dropZone.onclick = () => document.getElementById('img-file').click();
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = '#1a56db'; });
+dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '');
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.style.borderColor = '';
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) uploadImage(f);
+});
+document.getElementById('img-file').onchange = e => { if (e.target.files[0]) uploadImage(e.target.files[0]); };
+
+async function uploadImage(file) {
+  const msg = document.getElementById('upload-msg');
+  msg.style.display = 'block'; msg.textContent = 'Uploading image...';
+  const fd = new FormData(); fd.append('image', file);
+  try {
+    // Replace YOUR_API_KEY below with a free key from imgbb.com
+    const res = await fetch('https://api.imgbb.com/1/upload?key=YOUR_IMGBB_API_KEY', { method: 'POST', body: fd });
+    const d = await res.json();
+    if (d.success) {
+      document.getElementById('qr-text').value = d.data.url;
+      msg.textContent = '✓ Image hosted. Generating QR...';
+      generateQR();
+    } else throw 0;
+  } catch {
+    msg.textContent = 'Image hosting failed. Paste the image URL manually.';
+  }
+}
+
+// ── Downloads ─────────────────────────────────────────────────────────────────
+document.getElementById('dl-png').onclick = () => {
+  if (!S.matrix) return;
+  const a = document.createElement('a');
+  a.download = 'qrcode.png'; a.href = canvas.toDataURL('image/png'); a.click();
+};
+
+document.getElementById('dl-svg').onclick = () => {
+  if (!S.matrix) return;
+  const sz = S.matrix.modules.size, data = S.matrix.modules.data;
+  const margin = 2, total = sz + margin * 2, svgSize = 500, ms = svgSize / total;
+  let rects = '';
+  for (let r = 0; r < sz; r++)
+    for (let c = 0; c < sz; c++)
+      if (data[r * sz + c])
+        rects += `<rect x="${((c + margin) * ms).toFixed(1)}" y="${((r + margin) * ms).toFixed(1)}" width="${ms.toFixed(1)}" height="${ms.toFixed(1)}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}"><rect width="${svgSize}" height="${svgSize}" fill="${S.bgColor}"/><g fill="${S.qrColor}">${rects}</g></svg>`;
+  const a = document.createElement('a');
+  a.download = 'qrcode.svg';
+  a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// ── Swatch previews ───────────────────────────────────────────────────────────
+function drawSwatches() {
+  const dots = ['square', 'rounded', 'circle', 'diamond', 'star', 'cross'];
+  dots.forEach(s => {
+    const el = document.getElementById('p-' + s); if (!el) return;
+    const cx = el.getContext('2d'); cx.clearRect(0, 0, 40, 40);
+    [[2, 2], [15, 2], [28, 2], [2, 15], [15, 15], [28, 15], [2, 28], [15, 28], [28, 28]].forEach(([px, py]) => {
+      if ((px === 15 && py === 15)) return;
+      drawDot(cx, px, py, 11, s, '#333');
+    });
+  });
+
+  ['square', 'rounded', 'extra'].forEach(s => {
+    const el = document.getElementById('pc-' + s); if (!el) return;
+    const cx = el.getContext('2d'); cx.clearRect(0, 0, 40, 40);
+    const ms = 5.5, r = s === 'square' ? 0 : s === 'rounded' ? ms * 0.9 : ms * 1.6;
+    cx.fillStyle = '#333'; rr(cx, 0, 0, 7 * ms, 7 * ms, r); cx.fill();
+    cx.fillStyle = '#fff'; rr(cx, ms, ms, 5 * ms, 5 * ms, r * 0.55); cx.fill();
+    cx.fillStyle = '#333'; rr(cx, 2 * ms, 2 * ms, 3 * ms, 3 * ms, r * 0.32); cx.fill();
+  });
+
+  const fp = { none: null, simple: 0, rounded: 8, label: 4 };
+  Object.entries(fp).forEach(([s, fRadius]) => {
+    const el = document.getElementById('pf-' + s); if (!el) return;
+    const cx = el.getContext('2d'); cx.clearRect(0, 0, 40, 40);
+    if (s === 'none') {
+      cx.fillStyle = '#eee'; cx.fillRect(4, 4, 32, 32);
+      cx.fillStyle = '#999'; [[6,6],[16,6],[6,16]].forEach(([px,py])=>{ cx.fillRect(px,py,8,8); });
+    } else {
+      cx.strokeStyle = '#333'; cx.lineWidth = 2;
+      rr(cx, 1, 1, 38, s === 'label' ? 30 : 38, fRadius || 0); cx.stroke();
+      if (s === 'label') { cx.fillStyle = '#333'; cx.font = 'bold 7px sans-serif'; cx.textAlign = 'center'; cx.fillText('SCAN ME', 20, 38); }
+    }
+  });
+}
+
+window.addEventListener('load', () => { drawSwatches(); generateQR(); });
+</script>
+</body>
+</html>
